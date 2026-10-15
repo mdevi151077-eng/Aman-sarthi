@@ -49,10 +49,16 @@ function fakeGemini(chunks = [{ text: 'Hello there.' }]) {
 
 test('health aliases and readiness reveal configuration without exposing secrets', async () => {
   const baseUrl = await startServer({ env: { NODE_ENV: 'test' } });
+  const root = await fetch(`${baseUrl}/`);
   const health = await fetch(`${baseUrl}/healthz`);
   const renderHealth = await fetch(`${baseUrl}/health`);
   const ready = await fetch(`${baseUrl}/readyz`);
 
+  assert.equal(root.status, 200);
+  assert.deepEqual(await root.json(), {
+    status: 'ok',
+    message: 'Aman Sarthi API is Live',
+  });
   assert.equal(health.status, 200);
   assert.deepEqual(await health.json(), { status: 'ok' });
   assert.equal(renderHealth.status, 200);
