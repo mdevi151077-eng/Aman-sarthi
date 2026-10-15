@@ -236,7 +236,13 @@ export function createAppServer({ env = process.env, aiClient } = {}) {
       }
     }
   });
-
+app.get('/', (request, response) => {
+  response.json({ status: 'ok', message: 'Aman Sarthi API is Live' });
+});
+app.get('/health', (request, response) => {
+  response.json({ status: 'ok' });
+});
+  
   app.use((request, response) => {
     sendError(
       response,
