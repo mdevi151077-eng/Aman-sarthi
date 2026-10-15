@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Aman Sarthi AI (Edge)",
+      "request": "launch",
+      "type": "dart",
+      "deviceId": "edge",
+      "program": "lib/main.dart",
+      "toolArgs": [
+        "--dart-define=AI_API_BASE_URL=http://localhost:8090"
+      ]
+    },
+    {
+      "name": "Aman Sarthi AI (Windows)",
+      "request": "launch",
+      "type": "dart",
+      "deviceId": "windows",
+      "program": "lib/main.dart",
+      "toolArgs": [
+        "--dart-define=AI_API_BASE_URL=http://localhost:8090"
+      ]
+    }
+  ]
+}
