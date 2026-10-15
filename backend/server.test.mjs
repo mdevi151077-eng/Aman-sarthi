@@ -47,13 +47,16 @@ function fakeGemini(chunks = [{ text: 'Hello there.' }]) {
   };
 }
 
-test('health and readiness reveal configuration without exposing secrets', async () => {
+test('health aliases and readiness reveal configuration without exposing secrets', async () => {
   const baseUrl = await startServer({ env: { NODE_ENV: 'test' } });
   const health = await fetch(`${baseUrl}/healthz`);
+  const renderHealth = await fetch(`${baseUrl}/health`);
   const ready = await fetch(`${baseUrl}/readyz`);
 
   assert.equal(health.status, 200);
   assert.deepEqual(await health.json(), { status: 'ok' });
+  assert.equal(renderHealth.status, 200);
+  assert.deepEqual(await renderHealth.json(), { status: 'ok' });
   assert.equal(ready.status, 503);
   assert.deepEqual(await ready.json(), { ready: false });
 });
@@ -145,6 +148,8 @@ test('streams Gemini chunks and keeps provider credentials server-side', async (
   ]);
   assert.equal(gemini.parameters.model, 'gemini-test-model');
   assert.match(gemini.parameters.config.systemInstruction, /study assistant/);
+  assert.equal(gemini.parameters.config.httpOptions.timeout, 90_000);
+  assert.ok(gemini.parameters.config.abortSignal instanceof AbortSignal);
   assert.doesNotMatch(body, /test-key-not-a-real-credential/);
 });
 
@@ -189,4 +194,29 @@ test('maps provider rate limits without leaking upstream response details', asyn
   assert.match(body, /gemini_rate_limited/);
   assert.doesNotMatch(body, /test-key-not-a-real-credential/);
   assert.doesNotMatch(body, /private provider detail/);
+});
+
+test('maps provider timeouts to a safe gateway timeout response', async () => {
+  const baseUrl = await startServer({
+    env: configuredEnv,
+    aiClient: {
+      models: {
+        async generateContentStream() {
+          throw Object.assign(new Error('private timeout detail'), {
+            name: 'TimeoutError',
+          });
+        },
+      },
+    },
+  });
+  const response = await fetch(`${baseUrl}/api/chat`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ messages: [{ role: 'user', content: 'Hi' }] }),
+  });
+  const body = await response.text();
+
+  assert.equal(response.status, 504);
+  assert.match(body, /gemini_timeout/);
+  assert.doesNotMatch(body, /private timeout detail/);
 });

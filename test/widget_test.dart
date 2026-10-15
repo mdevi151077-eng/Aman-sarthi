@@ -1,4 +1,7 @@
+import 'package:aman_sarthi/ai_chat.dart';
+import 'package:aman_sarthi/ai_service.dart';
 import 'package:aman_sarthi/main.dart';
+import 'package:aman_sarthi/quiz_store.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
@@ -70,24 +73,45 @@ void main() {
     await tester.pumpWidget(const AmanSarthiApp());
     await tester.pumpAndSettle();
 
-    final homeScroll = find.byType(Scrollable).first;
-    await tester.scrollUntilVisible(
-      find.text('Class 6'),
-      350,
-      scrollable: homeScroll,
-    );
-    expect(find.text('Class 6'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.text('Class 12'),
-      350,
-      scrollable: homeScroll,
-    );
-    expect(find.text('Class 12'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.text('Graduation'),
-      350,
-      scrollable: homeScroll,
-    );
+    final homeScroll = find
+        .descendant(
+          of: find.byKey(const ValueKey('home-dashboard-scroll')),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    final homeList = find.byKey(const ValueKey('home-dashboard-scroll'));
+    for (final className in [
+      'Class 6',
+      'Class 7',
+      'Class 8',
+      'Class 9',
+      'Class 10',
+      'Class 11',
+      'Class 12',
+    ]) {
+      await tester.scrollUntilVisible(
+        find.text(className),
+        350,
+        scrollable: homeScroll,
+      );
+      await tester.tap(find.text(className).last);
+      await tester.pumpAndSettle();
+      expect(find.text(className).first, findsOneWidget);
+      expect(find.text('Your courses'), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+    }
+    for (var attempt = 0; attempt < 6; attempt++) {
+      if (find
+          .byKey(const ValueKey('home-graduation-card'))
+          .evaluate()
+          .isNotEmpty) {
+        break;
+      }
+      await tester.drag(homeList, const Offset(0, -500));
+      await tester.pumpAndSettle();
+    }
+    expect(find.byKey(const ValueKey('home-graduation-card')), findsOneWidget);
     await tester.tap(find.text('Graduation').last);
     await tester.pumpAndSettle();
 
@@ -128,17 +152,16 @@ void main() {
     expect(find.text('Maths'), findsOneWidget);
   });
 
-  testWidgets('AI chat reports the missing backend instead of faking a reply', (
+  testWidgets('AI chat explains a missing backend without faking a reply', (
     tester,
   ) async {
     SharedPreferencesAsyncPlatform.instance =
         InMemorySharedPreferencesAsync.empty();
-    await tester.pumpWidget(const AmanSarthiApp());
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('AI Tutor').last);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Chat shuru karein'));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AiChatPage(aiService: AiService.backend(baseUrl: '')),
+      ),
+    );
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField).last, 'Hello');
@@ -151,5 +174,47 @@ void main() {
       reason: 'The app must explain missing backend configuration.',
     );
     expect(find.text('Hello'), findsOneWidget);
+  });
+
+  testWidgets('students can complete a question and review its result', (
+    tester,
+  ) async {
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.empty();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: QuizAttemptPage(
+          quiz: StudyQuiz.fromJson({
+            'title': 'My chapter test',
+            'subject': 'Maths',
+            'chapter': 'Algebra',
+            'durationMinutes': 0,
+            'questions': [
+              {
+                'prompt': '2 + 2?',
+                'options': ['3', '4'],
+                'answerIndex': 1,
+                'explanation': 'Add two and two.',
+                'marks': 2,
+                'negativeMarks': 0.5,
+              },
+            ],
+          }),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('2 + 2?'), findsOneWidget);
+    await tester.tap(find.text('4'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Submit test'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Submit test'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('2.0 / 2.0 marks'), findsOneWidget);
+    expect(find.textContaining('100.0% accuracy'), findsOneWidget);
+    expect(find.text('Add two and two.'), findsOneWidget);
   });
 }

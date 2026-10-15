@@ -11,7 +11,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'ai_service.dart';
 
 class AiChatPage extends StatefulWidget {
-  const AiChatPage({super.key});
+  const AiChatPage({super.key, this.aiService});
+
+  final AiService? aiService;
 
   @override
   State<AiChatPage> createState() => _AiChatPageState();
@@ -25,7 +27,8 @@ class _AiChatPageState extends State<AiChatPage> {
   final _picker = ImagePicker();
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
-  final _aiService = AiService.fromEnvironment();
+  late final AiService _aiService;
+  late final bool _ownsAiService;
   final _preferences = SharedPreferencesAsync();
   List<_ChatMessage> _messages = _welcomeMessages();
   final List<_SavedConversation> _history = [];
@@ -49,6 +52,8 @@ class _AiChatPageState extends State<AiChatPage> {
   @override
   void initState() {
     super.initState();
+    _ownsAiService = widget.aiService == null;
+    _aiService = widget.aiService ?? AiService.fromEnvironment();
     unawaited(_loadHistory());
   }
 
@@ -465,7 +470,7 @@ class _AiChatPageState extends State<AiChatPage> {
   void dispose() {
     _controller.dispose();
     _scrollController.dispose();
-    _aiService.close();
+    if (_ownsAiService) _aiService.close();
     super.dispose();
   }
 

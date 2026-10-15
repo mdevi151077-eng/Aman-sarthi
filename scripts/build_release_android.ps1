@@ -5,7 +5,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 if ([string]::IsNullOrWhiteSpace($ApiBaseUrl)) {
-    throw 'Set AI_API_BASE_URL to the deployed backend HTTPS base URL before building.'
+    $ApiBaseUrl = 'https://aman-sarthi.onrender.com'
 }
 
 $parsedUrl = $null

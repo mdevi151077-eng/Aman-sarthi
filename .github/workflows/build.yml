@@ -1,0 +1,69 @@
+name: Build Flutter and backend
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: false
+
+      - name: Install backend dependencies
+        run: npm install --legacy-peer-deps
+        working-directory: backend
+
+      - name: Test backend
+        run: npm test
+        working-directory: backend
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Analyze Flutter project
+        run: flutter analyze
+
+      - name: Test Flutter project
+        run: flutter test
+
+      - name: Build Flutter web
+        run: flutter build web
+
+      - name: Build Android debug APK
+        run: flutter build apk --debug
+
+      - name: Upload web build
+        uses: actions/upload-artifact@v4
+        with:
+          name: aman-sarthi-web
+          path: build/web/
+          if-no-files-found: error
+
+      - name: Upload Android debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: aman-sarthi-android-debug
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error

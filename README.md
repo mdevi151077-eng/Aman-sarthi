@@ -8,33 +8,34 @@ calls a Flutter service backed by an Express API using Google's official
 ## Current AI setup and privacy
 
 `AI_API_BASE_URL` is a Flutter compile-time setting, not an Android runtime
-setting. If chat reports that the URL is not configured, the installed APK
-was built without `--dart-define=AI_API_BASE_URL=...`; changing Render settings
-alone cannot update an already-installed APK. The URL must be the public HTTPS
-base URL of the deployed backend (not `/api/chat` itself). The app appends
-`/api/chat` and uses `/readyz` for its **Test AI connection** action.
+setting. It defaults to the verified Render service
+`https://aman-sarthi.onrender.com`; set `--dart-define=AI_API_BASE_URL=...` to
+override it for another backend. Changing this default or the define affects
+new builds, not already-installed APKs. The URL must be the public HTTPS base
+URL (not `/api/chat` itself). The app appends `/api/chat` and uses `/readyz`
+for its **Test AI connection** action.
 
-This repository does not contain a deployed backend URL or Gemini credential.
-`render.yaml` describes a service but does not create it or reveal the hostname
-Render assigns. Create/deploy the Render service, set `GEMINI_API_KEY` in its
-Environment settings as a secret, then copy the actual HTTPS service URL shown
-by Render. Create the API key in Google AI Studio. Never put it in Flutter, a
+The Render health endpoint `/health` and readiness endpoint `/readyz` were
+verified at `https://aman-sarthi.onrender.com`. `/readyz` confirms that the
+backend sees its Gemini configuration; it does not prove that a real generation
+will succeed. Create the API key in Google AI Studio and set `GEMINI_API_KEY`
+in Render's Environment settings as a secret. Never put it in Flutter, a
 `--dart-define`, the APK, or this repository.
 
 For Android releases, the preflight script checks HTTPS, backend readiness, and
 one real Gemini streamed answer before compiling. This makes a small live
-Gemini request and will stop if the key or model is invalid. In PowerShell, set
-the URL copied from the deployed service and run:
+Gemini request and will stop if the key or model is invalid. The script
+defaults to the verified Render URL; set `AI_API_BASE_URL` only to override it.
+Run:
 
 ```powershell
-$env:AI_API_BASE_URL = 'https://<actual-service-host-from-render>'
 powershell -ExecutionPolicy Bypass -File .\scripts\build_release_android.ps1
 ```
 
-Replace the illustrative value with the actual Render URL; the script rejects
-it until the backend returns a real Gemini response. `AI_API_BASE_URL`
-is an address, not a secret. The policy override applies only to that process
-and does not change the machine's persistent setting. Chat turns are sent to
+The script stops unless the backend returns a real Gemini response.
+`AI_API_BASE_URL` is an address, not a secret. The policy override applies
+only to that process and does not change the machine's persistent setting.
+Chat turns are sent to
 your configured backend, which forwards them to Gemini. Google may process
 submitted message content under its own terms and retention policy. Up to 20
 conversations (50 text messages each) are saved on this device using local
@@ -44,6 +45,43 @@ current text-only chat flow. No end-to-end encryption is claimed.
 
 With no backend URL, the app shows a configuration message when a text prompt
 is sent; it does not silently switch to local Ollama or a fake model.
+
+## Private practice tests
+
+The Practice Tests screen supports manually authored multiple-choice tests and
+validated JSON imports with up to 100 questions per test. Each question can
+include 2–8 options, a zero-based `answerIndex`, explanation, difficulty,
+marks, and negative marks. A test can include course, subject, chapter, and a
+duration in minutes (`0` means untimed). For example:
+
+```json
+{
+  "title": "My chapter test",
+  "course": "Class 10",
+  "subject": "Maths",
+  "chapter": "Algebra",
+  "durationMinutes": 30,
+  "questions": [
+    {
+      "prompt": "Question text",
+      "options": ["First", "Second"],
+      "answerIndex": 1,
+      "explanation": "Solution text",
+      "difficulty": "Medium",
+      "marks": 1,
+      "negativeMarks": 0.25
+    }
+  ]
+}
+```
+
+Questions, answer keys, in-progress answers, and attempt results are stored in
+the device's app preferences. This is a private practice tool, not secure
+publishing: answer keys are not protected from the device owner, attempts are
+not server-verified, and content does not sync across devices. No Firebase
+project, Firebase Auth/Firestore/Storage integration, or trusted admin service
+is configured in this repository. Do not use this local question bank to
+publish paid or confidential exams.
 
 ## Backend: local Windows setup
 
@@ -67,7 +105,7 @@ node --env-file=.env server.mjs
 In another terminal, check readiness and run backend tests:
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:8080/healthz
+Invoke-RestMethod http://127.0.0.1:8080/health
 Invoke-RestMethod http://127.0.0.1:8080/readyz
 npm.cmd test
 curl.exe -N -H "Content-Type: application/json" --data-raw '{"messages":[{"role":"user","content":"Reply with READY."}]}' http://127.0.0.1:8080/api/chat
@@ -117,7 +155,7 @@ argument.
 ### Render Free (testing and hobby use)
 
 The root `render.yaml` defines a Node web service using the `backend` directory,
-the existing start command, and `/healthz` health checks. Create a Render
+the existing start command, and `/health` health checks. Create a Render
 account, connect a Git repository containing this project, and create a service
 from the Blueprint. Set `GEMINI_API_KEY` in the service's Environment settings
 as a secret; do not add it to the repository. Render shows the actual HTTPS
@@ -132,20 +170,28 @@ Configure these server environment variables:
 
 - `NODE_ENV=production`
 - `HOST=0.0.0.0` (required by container hosts such as Cloud Run; local default
-  is loopback only)
+  is also `0.0.0.0`)
 - `GEMINI_MODEL=gemini-flash-latest` (or another model available to your key)
 - `GEMINI_API_KEY` from Google AI Studio, stored as a Render secret
-- `CORS_ORIGINS` as a comma-separated list of exact production web origins
+- `CORS_ORIGINS=https://amansarthi-175ef.web.app` for the configured Firebase
+  Hosting origin; add any custom web domains as exact comma-separated origins
 - `RATE_LIMIT_WINDOW_MS` and `RATE_LIMIT_MAX_REQUESTS` as appropriate
 
 The host must bind the supplied `PORT`, allow outbound HTTPS to Google,
 set `HOST=0.0.0.0` when required by its container network, and terminate
-inbound TLS. Check `/healthz` for process liveness and `/readyz` for backend
-configuration. Deployment has not been performed from this workspace; no
-Gemini key or deployment credentials are available here.
+inbound TLS. Check `/health` for process liveness and `/readyz` for backend
+configuration. `/healthz` remains available as a compatibility alias.
+Gemini requests have a 90-second timeout. For Flutter Web, set `CORS_ORIGINS`
+to the exact deployed origin; the configured Firebase Hosting origin is shown
+above. The live API currently rejects the web origin until this Render
+environment setting is applied. CORS is not authentication. The backend
+currently has no user authentication, and its rate limiter is in-memory, so
+do not treat it as production abuse protection for a public service.
+Deployment has not been performed from this workspace; no Gemini key or
+deployment credentials are available here.
 
-After deployment, copy the real HTTPS base URL from the Render service page.
-Set `AI_API_BASE_URL` to that URL without adding `/api/chat`, then build:
+To override the default, set `AI_API_BASE_URL` to another HTTPS base URL without
+adding `/api/chat`, then build:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\build_release_android.ps1

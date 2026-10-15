@@ -4,14 +4,16 @@ services:
     runtime: node
     plan: free
     rootDir: backend
-    buildCommand: npm ci
-    startCommand: npm start
-    healthCheckPath: /healthz
+    buildCommand: npm install
+    startCommand: node server.mjs
+    healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
       - key: HOST
         value: 0.0.0.0
+      - key: CORS_ORIGINS
+        value: https://amansarthi-175ef.web.app
       - key: GEMINI_MODEL
         value: gemini-flash-latest
       - key: GEMINI_API_KEY

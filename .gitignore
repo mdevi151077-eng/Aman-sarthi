@@ -38,6 +38,16 @@ migrate_working_dir/
 /backend/.env
 node_modules/
 
+# Private signing material, certificates, and service-account credentials
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+service-account*.json
+*serviceAccountKey*.json
+
 # Symbolication related
 app.*.symbols
 

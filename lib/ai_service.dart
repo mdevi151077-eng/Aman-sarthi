@@ -77,7 +77,10 @@ class AiService {
       'AI_PROVIDER',
       defaultValue: 'backend',
     );
-    const apiBaseUrl = String.fromEnvironment('AI_API_BASE_URL');
+    const apiBaseUrl = String.fromEnvironment(
+      'AI_API_BASE_URL',
+      defaultValue: 'https://aman-sarthi.onrender.com',
+    );
     const ollamaBaseUrl = String.fromEnvironment('OLLAMA_BASE_URL');
 
     if (provider == 'backend') {

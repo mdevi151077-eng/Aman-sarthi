@@ -10,8 +10,13 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 
 const DEFAULT_MODEL = 'gemini-flash-latest';
+const GEMINI_TIMEOUT_MS = 90_000;
 const SYSTEM_INSTRUCTION =
-  'You are Aman Sarthi, a helpful study assistant. Reply accurately, clearly, and respectfully.';
+  'You are Aman Sarthi, a helpful study assistant. Reply accurately, clearly, and respectfully. ' +
+  'Use the language of the learner when practical, including Hindi or English. ' +
+  'For mathematics, show a step-by-step solution with the key reasoning and calculations before the final answer. ' +
+  'For science, explain concepts and terminology clearly. For English or Hindi, explain language questions with examples when useful. ' +
+  'If a question is ambiguous or missing essential information, ask a concise clarifying question rather than inventing details.';
 
 class ApiError extends Error {
   constructor(status, code, message) {
@@ -73,6 +78,13 @@ function validateMessages(value) {
 
 function providerError(error) {
   const status = Number(error?.status ?? error?.response?.status);
+  if (
+    error?.name === 'TimeoutError' ||
+    error?.name === 'AbortError' ||
+    error?.code === 'ETIMEDOUT'
+  ) {
+    return new ApiError(504, 'gemini_timeout', 'Gemini took too long to respond. Try again.');
+  }
   if (status === 429) {
     return new ApiError(429, 'gemini_rate_limited', 'Gemini is busy. Try again shortly.');
   }
@@ -154,7 +166,7 @@ export function createAppServer({ env = process.env, aiClient } = {}) {
       ),
   });
 
-  app.get('/healthz', (_request, response) => {
+  app.get(['/health', '/healthz'], (_request, response) => {
     response.json({ status: 'ok' });
   });
 
@@ -187,7 +199,11 @@ export function createAppServer({ env = process.env, aiClient } = {}) {
           role: message.role === 'assistant' ? 'model' : 'user',
           parts: [{ text: message.content }],
         })),
-        config: { systemInstruction: SYSTEM_INSTRUCTION },
+        config: {
+          systemInstruction: SYSTEM_INSTRUCTION,
+          httpOptions: { timeout: GEMINI_TIMEOUT_MS },
+          abortSignal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
+        },
       });
 
       response.status(200);
@@ -273,7 +289,7 @@ if (
 ) {
   const server = createAppServer();
   const port = Number(process.env.PORT ?? 8080);
-  const host = process.env.HOST ?? '127.0.0.1';
+  const host = process.env.HOST ?? '0.0.0.0';
   server.listen(port, host, () => {
     console.log(`Aman Sarthi AI API listening on ${host}:${port}`);
   });

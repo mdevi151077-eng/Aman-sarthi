@@ -6,6 +6,13 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 void main() {
+  test('uses the verified Render backend URL by default', () {
+    final service = AiService.fromEnvironment();
+    addTearDown(service.close);
+
+    expect(service.baseUrl, 'https://aman-sarthi.onrender.com');
+  });
+
   test(
     'backend streams generated text and omits client-controlled system turns',
     () async {
